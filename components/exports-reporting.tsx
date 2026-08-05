@@ -12,6 +12,7 @@ import {
   GraduationCap,
   Package,
 } from "lucide-react"
+import { AdminPasswordGate } from "@/components/admin-password-gate"
 import { AppHeader } from "@/components/app-header"
 import { PageGuide } from "@/components/page-guide"
 import { SchoolReport } from "@/components/school-report"
@@ -121,7 +122,8 @@ export function ExportsReporting({
 
       <PageGuide guideId="exports-reporting" />
 
-      <main className="mx-auto flex w-full max-w-[1200px] flex-col gap-8 px-4 py-6 sm:px-6">
+      <AdminPasswordGate>
+        <main className="mx-auto flex w-full max-w-[1200px] flex-col gap-8 px-4 py-6 sm:px-6">
         {/* Reports */}
         <section data-guide="exports-reports" className="flex flex-col gap-4">
           <div>
@@ -281,7 +283,8 @@ export function ExportsReporting({
             />
           </div>
         </section>
-      </main>
+        </main>
+      </AdminPasswordGate>
     </div>
   )
 }
