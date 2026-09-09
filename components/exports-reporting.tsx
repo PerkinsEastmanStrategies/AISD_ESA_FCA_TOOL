@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Download,
   FileText,
@@ -16,6 +16,7 @@ import { AdminPasswordGate } from "@/components/admin-password-gate"
 import { AppHeader } from "@/components/app-header"
 import { PageGuide } from "@/components/page-guide"
 import { SchoolReport } from "@/components/school-report"
+import { ReportPhotoPicker } from "@/components/report-photo-picker"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { schools } from "@/lib/schools-list"
@@ -29,6 +30,7 @@ import {
   type ExportScope,
 } from "@/lib/export-data"
 import { hasCapitalPlanSelections, useCapitalPlan } from "@/lib/capital-plan-store"
+import { reportPicturesForSchool } from "@/lib/lively-pictures"
 
 interface ExportsReportingProps {
   selectedId: string
@@ -93,13 +95,42 @@ export function ExportsReporting({
   const { plan } = useCapitalPlan(school.id)
   const [exportScope, setExportScope] = useState<ExportScope>("school")
   const [includeCapitalPlan, setIncludeCapitalPlan] = useState(true)
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([])
   const [showReport, setShowReport] = useState(false)
 
   const planHasSelections = hasCapitalPlanSelections(plan)
+  const reportPictures = useMemo(() => reportPicturesForSchool(school.id), [school.id])
+  const allReportPictures = useMemo(
+    () => [...reportPictures.facility, ...reportPictures.asset],
+    [reportPictures],
+  )
+  const recommendedPhotoIds = useMemo(
+    () =>
+      [...reportPictures.facility]
+        .sort((a, b) => {
+          const priority = (name: string) =>
+            /report photo/i.test(name) ? 0 : /elevation|exterior|entrance/i.test(name) ? 1 : 2
+          return priority(a.photoName) - priority(b.photoName)
+        })
+        .slice(0, 10)
+        .map((photo) => photo.id),
+    [reportPictures.facility],
+  )
+  const selectedReportPhotos = useMemo(() => {
+    const byId = new Map(allReportPictures.map((photo) => [photo.id, photo]))
+    return selectedPhotoIds.flatMap((id) => {
+      const photo = byId.get(id)
+      return photo ? [photo] : []
+    })
+  }, [allReportPictures, selectedPhotoIds])
   const exportCount = exportSchoolCount(exportScope, schools, school.id)
   const scopeSchoolId = exportScope === "school" ? school.id : undefined
 
   const reportIncludesPlan = includeCapitalPlan && planHasSelections
+
+  useEffect(() => {
+    setSelectedPhotoIds([])
+  }, [school.id])
 
   const downloadSlug = useMemo(() => {
     if (exportScope === "school") return school.id
@@ -160,6 +191,27 @@ export function ExportsReporting({
               </div>
             </label>
 
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3">
+              <div>
+                <span className="text-sm font-medium text-foreground">Report photos</span>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {allReportPictures.length > 0
+                    ? `Choose up to 20 specific photos from ${allReportPictures.length} linked images.`
+                    : `No report photos are linked for ${school.name} yet.`}
+                </p>
+              </div>
+              {allReportPictures.length > 0 ? (
+                <ReportPhotoPicker
+                  key={school.id}
+                  photos={allReportPictures}
+                  selectedIds={selectedPhotoIds}
+                  recommendedIds={recommendedPhotoIds}
+                  onChange={setSelectedPhotoIds}
+                  maxPhotos={20}
+                />
+              ) : null}
+            </div>
+
             <div className="flex flex-wrap gap-2">
               <Button type="button" onClick={() => setShowReport(true)} className="gap-1.5">
                 <FileText className="size-4" aria-hidden="true" />
@@ -184,6 +236,7 @@ export function ExportsReporting({
               school={school}
               includeCapitalPlan={reportIncludesPlan}
               capitalPlan={plan}
+              reportPhotos={selectedReportPhotos}
               showActions={false}
             />
           )}

@@ -17,6 +17,7 @@ import {
   Map as MapIcon,
   ChartScatter,
   Hammer,
+  Images,
 } from "lucide-react"
 import {
   type School,
@@ -52,6 +53,7 @@ import { formatNumber, formatMillions, formatRange } from "@/lib/format"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { SchoolComparisonCharts } from "@/components/school-comparison-charts"
+import type { LivelyPicture } from "@/lib/lively-pictures"
 
 interface SchoolReportProps {
   school: School
@@ -59,6 +61,7 @@ interface SchoolReportProps {
   showActions?: boolean
   includeCapitalPlan?: boolean
   capitalPlan?: SchoolCapitalPlanState
+  reportPhotos?: LivelyPicture[]
 }
 
 const STATUS_LABEL: Record<StatusLevel, string> = {
@@ -80,6 +83,7 @@ export function SchoolReport({
   showActions = true,
   includeCapitalPlan = false,
   capitalPlan,
+  reportPhotos = [],
 }: SchoolReportProps) {
   const generatedOn = useMemo(
     () => new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
@@ -166,6 +170,7 @@ export function SchoolReport({
   const planDisplaySrc = floorPlanDisplaySrc(school)
   const planVb = floorPlanViewBox(school)
   const showPlanOverlays = floorPlanHasRoomOverlays(school)
+  const photoPages = useMemo(() => chunk(reportPhotos, 12), [reportPhotos])
 
   return (
     <div className="flex flex-col gap-6">
@@ -569,11 +574,73 @@ export function SchoolReport({
           indicates the overall suitability condition for each assessed space.
         </footer>
       </article>
+
+      {photoPages.map((photos, pageIndex) => (
+        <article
+          key={`photos-${pageIndex}`}
+          className="report-sheet report-page-break mx-auto w-full max-w-[1000px] rounded-xl border border-border bg-card p-6 shadow-sm sm:p-10"
+        >
+          <header className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-6">
+            <div className="flex items-center gap-3">
+              <img src="/images/aisd-logo.jpg" alt="Austin ISD logo" className="h-12 w-auto shrink-0" />
+              <div className="border-l border-border pl-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Facility Assessment Summary
+                </p>
+                <h1 className="text-pretty text-2xl font-semibold text-foreground">
+                  {school.name} — Photo Gallery
+                </h1>
+              </div>
+            </div>
+            <div className="text-right text-xs text-muted-foreground">
+              <p className="font-medium text-foreground">Austin ISD</p>
+              <p>
+                Photo page {pageIndex + 1} of {photoPages.length}
+              </p>
+              <p>Generated {generatedOn}</p>
+            </div>
+          </header>
+
+          <Section title="Assessment Photos" icon={Images}>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {photos.map((photo) => (
+                <figure
+                  key={photo.id}
+                  className="overflow-hidden rounded-lg border border-border bg-background"
+                >
+                  <img
+                    src={photo.url}
+                    alt={`${photo.photoName} — ${photo.parentName}`}
+                    className="h-36 w-full object-cover"
+                    loading="eager"
+                  />
+                  <figcaption className="p-2.5">
+                    <p className="truncate text-xs font-semibold text-foreground">{photo.photoName}</p>
+                    <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                      {photo.parentType} · {photo.parentName}
+                    </p>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </Section>
+
+          <footer className="mt-8 border-t border-border pt-4 text-[11px] text-muted-foreground">
+            Photos are sourced from the linked facility assessment record and shown for documentation purposes.
+          </footer>
+        </article>
+      ))}
     </div>
   )
 }
 
 /* ----------------------------- sub-components ----------------------------- */
+
+function chunk<T>(items: T[], size: number): T[][] {
+  return Array.from({ length: Math.ceil(items.length / size) }, (_, index) =>
+    items.slice(index * size, (index + 1) * size),
+  )
+}
 
 function Section({
   title,

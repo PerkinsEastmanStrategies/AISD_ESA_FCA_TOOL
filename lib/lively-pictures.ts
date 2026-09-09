@@ -11,6 +11,28 @@ export interface LivelyPicture {
 
 export const livelyPictureRecords = livelyPictures as LivelyPicture[]
 
+/** All facility-level photos, including building and site-wide records. */
+export function livelyFacilityPictures(): LivelyPicture[] {
+  return livelyPictureRecords.filter((p) => p.parentType === "Facility")
+}
+
+/** All equipment and building-system asset photos. */
+export function livelyAssetPictures(): LivelyPicture[] {
+  return livelyPictureRecords.filter((p) => p.parentType === "Asset")
+}
+
+/** Photo records are currently linked only for the Lively demo campus. */
+export function reportPicturesForSchool(
+  schoolId: string,
+): { facility: LivelyPicture[]; asset: LivelyPicture[] } {
+  if (schoolId !== "lively") return { facility: [], asset: [] }
+
+  return {
+    facility: livelyFacilityPictures(),
+    asset: livelyAssetPictures(),
+  }
+}
+
 export function livelyBuildingParentName(building: string): string {
   return `Building ${building}`
 }
