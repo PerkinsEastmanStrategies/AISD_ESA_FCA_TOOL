@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   Download,
   FileText,
@@ -11,12 +11,12 @@ import {
   ClipboardList,
   GraduationCap,
   Package,
-  Images,
 } from "lucide-react"
 import { AdminPasswordGate } from "@/components/admin-password-gate"
 import { AppHeader } from "@/components/app-header"
 import { PageGuide } from "@/components/page-guide"
 import { SchoolReport } from "@/components/school-report"
+import { ReportPhotoPicker } from "@/components/report-photo-picker"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { schools } from "@/lib/schools-list"
@@ -95,18 +95,42 @@ export function ExportsReporting({
   const { plan } = useCapitalPlan(school.id)
   const [exportScope, setExportScope] = useState<ExportScope>("school")
   const [includeCapitalPlan, setIncludeCapitalPlan] = useState(true)
-  const [includeFacilityPhotos, setIncludeFacilityPhotos] = useState(false)
-  const [includeAssetPhotos, setIncludeAssetPhotos] = useState(false)
-  const [photoLimit, setPhotoLimit] = useState<6 | 12 | 24>(12)
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([])
   const [showReport, setShowReport] = useState(false)
 
   const planHasSelections = hasCapitalPlanSelections(plan)
   const reportPictures = useMemo(() => reportPicturesForSchool(school.id), [school.id])
-  const hasReportPictures = reportPictures.facility.length + reportPictures.asset.length > 0
+  const allReportPictures = useMemo(
+    () => [...reportPictures.facility, ...reportPictures.asset],
+    [reportPictures],
+  )
+  const recommendedPhotoIds = useMemo(
+    () =>
+      [...reportPictures.facility]
+        .sort((a, b) => {
+          const priority = (name: string) =>
+            /report photo/i.test(name) ? 0 : /elevation|exterior|entrance/i.test(name) ? 1 : 2
+          return priority(a.photoName) - priority(b.photoName)
+        })
+        .slice(0, 10)
+        .map((photo) => photo.id),
+    [reportPictures.facility],
+  )
+  const selectedReportPhotos = useMemo(() => {
+    const byId = new Map(allReportPictures.map((photo) => [photo.id, photo]))
+    return selectedPhotoIds.flatMap((id) => {
+      const photo = byId.get(id)
+      return photo ? [photo] : []
+    })
+  }, [allReportPictures, selectedPhotoIds])
   const exportCount = exportSchoolCount(exportScope, schools, school.id)
   const scopeSchoolId = exportScope === "school" ? school.id : undefined
 
   const reportIncludesPlan = includeCapitalPlan && planHasSelections
+
+  useEffect(() => {
+    setSelectedPhotoIds([])
+  }, [school.id])
 
   const downloadSlug = useMemo(() => {
     if (exportScope === "school") return school.id
@@ -167,56 +191,25 @@ export function ExportsReporting({
               </div>
             </label>
 
-            <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
-              <div className="flex items-start gap-3">
-                <Images className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-                <div>
-                  <span className="text-sm font-medium text-foreground">Include photo tiles</span>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Add selected facility and asset photos as gallery pages in the printable report.
-                  </p>
-                </div>
-              </div>
-
-              {hasReportPictures ? (
-                <div className="grid gap-3 pl-7 sm:grid-cols-2">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={includeFacilityPhotos}
-                      onChange={(e) => setIncludeFacilityPhotos(e.target.checked)}
-                      className="size-4 rounded border-border accent-primary"
-                    />
-                    Facility photos ({reportPictures.facility.length})
-                  </label>
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={includeAssetPhotos}
-                      onChange={(e) => setIncludeAssetPhotos(e.target.checked)}
-                      className="size-4 rounded border-border accent-primary"
-                    />
-                    Asset photos ({reportPictures.asset.length})
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-foreground sm:col-span-2">
-                    Maximum tiles
-                    <select
-                      value={photoLimit}
-                      onChange={(e) => setPhotoLimit(Number(e.target.value) as 6 | 12 | 24)}
-                      disabled={!includeFacilityPhotos && !includeAssetPhotos}
-                      className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value={6}>6 photos</option>
-                      <option value={12}>12 photos</option>
-                      <option value={24}>24 photos</option>
-                    </select>
-                  </label>
-                </div>
-              ) : (
-                <p className="pl-7 text-xs text-muted-foreground">
-                  No report photos are linked for {school.name} yet.
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 p-3">
+              <div>
+                <span className="text-sm font-medium text-foreground">Report photos</span>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {allReportPictures.length > 0
+                    ? `Choose up to 20 specific photos from ${allReportPictures.length} linked images.`
+                    : `No report photos are linked for ${school.name} yet.`}
                 </p>
-              )}
+              </div>
+              {allReportPictures.length > 0 ? (
+                <ReportPhotoPicker
+                  key={school.id}
+                  photos={allReportPictures}
+                  selectedIds={selectedPhotoIds}
+                  recommendedIds={recommendedPhotoIds}
+                  onChange={setSelectedPhotoIds}
+                  maxPhotos={20}
+                />
+              ) : null}
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -243,9 +236,7 @@ export function ExportsReporting({
               school={school}
               includeCapitalPlan={reportIncludesPlan}
               capitalPlan={plan}
-              includeFacilityPhotos={includeFacilityPhotos}
-              includeAssetPhotos={includeAssetPhotos}
-              photoLimit={photoLimit}
+              reportPhotos={selectedReportPhotos}
               showActions={false}
             />
           )}

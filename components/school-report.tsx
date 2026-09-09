@@ -53,10 +53,7 @@ import { formatNumber, formatMillions, formatRange } from "@/lib/format"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { SchoolComparisonCharts } from "@/components/school-comparison-charts"
-import {
-  reportPicturesForSchool,
-  type LivelyPicture,
-} from "@/lib/lively-pictures"
+import type { LivelyPicture } from "@/lib/lively-pictures"
 
 interface SchoolReportProps {
   school: School
@@ -64,9 +61,7 @@ interface SchoolReportProps {
   showActions?: boolean
   includeCapitalPlan?: boolean
   capitalPlan?: SchoolCapitalPlanState
-  includeFacilityPhotos?: boolean
-  includeAssetPhotos?: boolean
-  photoLimit?: 6 | 12 | 24
+  reportPhotos?: LivelyPicture[]
 }
 
 const STATUS_LABEL: Record<StatusLevel, string> = {
@@ -88,9 +83,7 @@ export function SchoolReport({
   showActions = true,
   includeCapitalPlan = false,
   capitalPlan,
-  includeFacilityPhotos = false,
-  includeAssetPhotos = false,
-  photoLimit = 12,
+  reportPhotos = [],
 }: SchoolReportProps) {
   const generatedOn = useMemo(
     () => new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
@@ -177,30 +170,7 @@ export function SchoolReport({
   const planDisplaySrc = floorPlanDisplaySrc(school)
   const planVb = floorPlanViewBox(school)
   const showPlanOverlays = floorPlanHasRoomOverlays(school)
-  const selectedPhotos = useMemo(() => {
-    const pictures = reportPicturesForSchool(school.id)
-    const facility = includeFacilityPhotos ? prioritizeFacilityPhotos(pictures.facility) : []
-    const asset = includeAssetPhotos ? prioritizeAssetPhotos(pictures.asset) : []
-
-    if (!facility.length) return asset.slice(0, photoLimit)
-    if (!asset.length) return facility.slice(0, photoLimit)
-
-    // Favor campus context while still including representative asset detail.
-    const mixed: LivelyPicture[] = []
-    let facilityIndex = 0
-    let assetIndex = 0
-    while (mixed.length < photoLimit && (facilityIndex < facility.length || assetIndex < asset.length)) {
-      for (let i = 0; i < 2 && facilityIndex < facility.length && mixed.length < photoLimit; i += 1) {
-        mixed.push(facility[facilityIndex++])
-      }
-      if (assetIndex < asset.length && mixed.length < photoLimit) {
-        mixed.push(asset[assetIndex++])
-      }
-    }
-    return mixed
-  }, [includeAssetPhotos, includeFacilityPhotos, photoLimit, school.id])
-
-  const photoPages = useMemo(() => chunk(selectedPhotos, 12), [selectedPhotos])
+  const photoPages = useMemo(() => chunk(reportPhotos, 12), [reportPhotos])
 
   return (
     <div className="flex flex-col gap-6">
@@ -665,27 +635,6 @@ export function SchoolReport({
 }
 
 /* ----------------------------- sub-components ----------------------------- */
-
-function prioritizeFacilityPhotos(photos: LivelyPicture[]): LivelyPicture[] {
-  return [...photos].sort((a, b) => facilityPhotoPriority(a) - facilityPhotoPriority(b))
-}
-
-function facilityPhotoPriority(photo: LivelyPicture): number {
-  if (/report photo/i.test(photo.photoName)) return 0
-  if (photo.parentName === "Site") return 1
-  if (/elevation|exterior|entrance/i.test(photo.photoName)) return 2
-  return 3
-}
-
-function prioritizeAssetPhotos(photos: LivelyPicture[]): LivelyPicture[] {
-  return [...photos].sort((a, b) => assetPhotoPriority(a) - assetPhotoPriority(b))
-}
-
-function assetPhotoPriority(photo: LivelyPicture): number {
-  if (/^asset$/i.test(photo.photoName)) return 0
-  if (/nameplate/i.test(photo.photoName)) return 1
-  return 2
-}
 
 function chunk<T>(items: T[], size: number): T[][] {
   return Array.from({ length: Math.ceil(items.length / size) }, (_, index) =>
